@@ -28,6 +28,7 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
     echo "--- Connecting to **$label** ---\n";
 
     // Simple DSN parsing to extract user/password for PDO constructor
+    // DSN format: pgsql:host=hostname;port=portnumber;dbname=database_name;user=username;password=mypassword
     $dsn_parts = explode(';', $dsn);
     $conn_dsn = '';
     $user = null;

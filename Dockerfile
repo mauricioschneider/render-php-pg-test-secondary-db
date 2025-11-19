@@ -6,9 +6,9 @@ WORKDIR /var/www/html
 # --- 1. Install Dependencies ---
 
 # Install required system libraries for PostgreSQL (libpq-dev)
-RUN apt-get update && apt-get install -y \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache libpq-dev \
+    # Install both the development and runtime packages for robust compilation
+    && apk add --no-cache libpq
 
 # Install pdo_pgsql extension (CRITICAL: Required by your script)
 RUN docker-php-ext-install pdo_pgsql

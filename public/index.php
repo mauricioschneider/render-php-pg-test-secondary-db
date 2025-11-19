@@ -1,34 +1,35 @@
 <?php
-// CRITICAL: Load the Composer autoloader from the parent directory
+// File: public/index.php
 require __DIR__ . '/../vendor/autoload.php';
+
+// --- Terminal Formatting Constants ---
+define('HEADER_START', "\n\033[1;34m"); // Bold Blue
+define('HEADER_END', "\033[0m\n");     // Reset
+define('SUCCESS', "\033[0;32m");       // Green
+define('ERROR', "\033[0;31m");         // Red
+define('RESET', "\033[0m");            // Reset
 
 // The SQL query to be executed on both databases
 $query = "SELECT * FROM test LIMIT 1";
 
 // --- 1. Get Connection Strings from Environment Variables ---
 
-// Example DSN format: "pgsql:host=localhost;port=5432;dbname=mydb;user=myuser;password=mypass"
 $dsn_a = getenv('DB_CONN_A');
 $dsn_b = getenv('DB_CONN_B');
 
 if (!$dsn_a || !$dsn_b) {
-    // Note: Use error_log in a real web app instead of die() for non-CLI
-    die("Error: Both DB_CONN_A and DB_CONN_B environment variables must be set.\n");
+    die(ERROR . "FATAL ERROR: Both DB_CONN_A and DB_CONN_B environment variables must be set." . RESET . "\n");
 }
 
 /**
  * Connects to a PostgreSQL database using PDO, executes a query, and prints the result.
- *
- * @param string $dsn The Data Source Name (DSN) for the connection.
- * @param string $label A label to identify the connection (e.g., "Database A").
- * @param string $sql The SQL query to execute.
  */
 function connectAndQuery(string $dsn, string $label, string $sql): void
 {
-    echo "--- Connecting to **$label** ---\n";
+    // Print a clearly visible header for this connection attempt
+    echo HEADER_START . "--- 🔍 DATABASE CONNECTION: $label ---" . HEADER_END;
 
     // Simple DSN parsing to extract user/password for PDO constructor
-    // DSN format: pgsql:host=hostname;port=portnumber;dbname=database_name;user=username;password=mypassword
     $dsn_parts = explode(';', $dsn);
     $conn_dsn = '';
     $user = null;
@@ -45,36 +46,49 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
         }
     }
 
+    // Output DSN info (excluding password for security)
+    echo "  > DSN (partial): " . str_replace("pgsql:", "", $conn_dsn) . "\n";
+    echo "  > Query: $sql\n";
+
+
     try {
-        // Establish the Connection
+        // 1. Establish the Connection
         $pdo = new PDO($conn_dsn, $user, $password, [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
         ]);
 
-        echo "Successfully connected to $label.\n";
+        echo SUCCESS . "  ✅ STATUS: Connection successful." . RESET . "\n";
 
-        // Execute the Query
+        // 2. Execute the Query
         $statement = $pdo->query($sql);
         $result = $statement->fetch();
 
+        echo "\n  --- RESULT DATA ---\n";
+
         if ($result) {
-            echo "Query Result for $label (first row):\n";
-            print_r($result);
+            echo SUCCESS . "  Total Fields: " . count($result) . RESET . "\n";
+            echo "  Data Row:\n";
+            // Print array contents with indentation for cleaner display
+            echo "  " . str_replace("\n", "\n  ", print_r($result, true));
         } else {
-            echo "Query executed successfully, but no rows were returned from 'test' table in $label.\n";
+            echo "  No rows were returned from 'test' table.\n";
         }
 
     } catch (PDOException $e) {
-        echo "PDO Connection/Query Error for **$label**:\n";
-        echo "Error details: ". $e->getMessage() . "\n";
+        echo ERROR . "  ❌ ERROR: PDO Connection or Query Failed." . RESET . "\n";
+        // Only print the first line of the error message for brevity
+        $error_message = strtok($e->getMessage(), "\n");
+        echo "  Details: " . $error_message . "\n";
     } finally {
         $pdo = null; // Close the connection
     }
-    echo "\n";
+    echo "\n----------------------------------------\n";
 }
 
 // --- 2. Call the function for both databases ---
 
-connectAndQuery($dsn_a, "Database A", $query);
-connectAndQuery($dsn_b, "Database B", $query);
+connectAndQuery($dsn_a, "Database A (Primary)", $query);
+connectAndQuery($dsn_b, "Database B (Secondary)", $query);
+
+?>

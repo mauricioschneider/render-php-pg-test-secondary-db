@@ -1,40 +1,37 @@
-# --- STAGE 1: Build Stage (Install Dependencies) ---
-# We use a base image with the required PHP version and extensions
-FROM php:8.3-cli AS composer_install
+# --- STAGE 1: Build Stage (Install Dependencies and Compile) ---
+FROM php:8.4.1-cli-alpine AS composer_install
 
-# Set working directory for the application code
 WORKDIR /app
 
-# Install required system dependencies for pgsql
+# 1. Install required SYSTEM dependencies (libpq-dev for headers/compilation)
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install the pdo_pgsql extension
+# 2. Install the pdo_pgsql extension
+# This step relies on libpq-dev being present
 RUN docker-php-ext-install pdo_pgsql
 
 # Install Composer
 COPY --from=composer/composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy only the necessary files for dependency resolution
+# Copy necessary files and install Composer dependencies
 COPY composer.json composer.lock ./
-
-# Install project dependencies
-# The --no-dev flag keeps the final image smaller
 RUN composer install --no-dev --optimize-autoloader
 
 # --- STAGE 2: Production Stage (Runtime Environment) ---
-# Use a minimal production base image (CLI since it's a script, not a web server)
+# We switch to an Alpine image for a smaller footprint.
 FROM php:8.4.1-cli-alpine
 
-# Set working directory
 WORKDIR /app
 
-# Install required system dependencies for pgsql on Alpine (musl libc)
+# 1. Install required RUNTIME dependencies on Alpine (libpq)
+# This package provides the necessary shared library files (.so)
 RUN apk add --no-cache libpq
 
-# Install the pdo_pgsql extension
-# The command below uses the PHP extension installer tailored for Alpine/Docker
+# 2. Re-install pdo_pgsql using the Alpine-specific base
+# This ensures the extension is compiled and linked against the Alpine libpq.
+# NOTE: This step is crucial because the previous stage's extension is linked against Debian's libs.
 RUN docker-php-ext-install pdo_pgsql
 
 # Copy application files (source code)
@@ -43,6 +40,5 @@ COPY . .
 # Copy installed dependencies from the build stage
 COPY --from=composer_install /app/vendor /app/vendor
 
-# Use CMD to define the default command that Render will execute.
-# This runs your script using the Composer 'start' alias.
+# Set the execution command
 CMD ["composer", "start"]

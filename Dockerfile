@@ -1,44 +1,33 @@
-# --- STAGE 1: Build Stage (Install Dependencies and Compile) ---
-FROM php:8.4.1-cli-alpine AS composer_install
+FROM richarvey/nginx-php-fpm:3.1.6
 
-WORKDIR /app
+# Set working directory
+WORKDIR /var/www/html
 
-# 1. Install required SYSTEM dependencies (libpq-dev for headers/compilation)
+# --- 1. Install Dependencies ---
+
+# Install required system libraries for PostgreSQL (libpq-dev)
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install the pdo_pgsql extension
-# This step relies on libpq-dev being present
+# Install pdo_pgsql extension (CRITICAL: Required by your script)
 RUN docker-php-ext-install pdo_pgsql
 
-# Install Composer
-COPY --from=composer/composer:latest /usr/bin/composer /usr/bin/composer
+# --- 2. Copy and Install Composer Dependencies ---
 
-# Copy necessary files and install Composer dependencies
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader
-
-# --- STAGE 2: Production Stage (Runtime Environment) ---
-# We switch to an Alpine image for a smaller footprint.
-FROM php:8.4.1-cli-alpine
-
-WORKDIR /app
-
-# 1. Install required RUNTIME dependencies on Alpine (libpq)
-# This package provides the necessary shared library files (.so)
-RUN apk add --no-cache libpq
-
-# 2. Re-install pdo_pgsql using the Alpine-specific base
-# This ensures the extension is compiled and linked against the Alpine libpq.
-# NOTE: This step is crucial because the previous stage's extension is linked against Debian's libs.
-RUN docker-php-ext-install pdo_pgsql
-
-# Copy application files (source code)
+# Copy application files (source code, composer files, etc.)
 COPY . .
 
-# Copy installed dependencies from the build stage
-COPY --from=composer_install /app/vendor /app/vendor
+# Install Composer dependencies (CRITICAL: Creates the 'vendor' directory)
+RUN composer install --no-dev --optimize-autoloader
 
-# Set the execution command
-CMD ["composer", "start"]
+# --- 3. Image Configuration ---
+
+# Set the document root to your public folder
+ENV WEBROOT /var/www/html/public
+
+# Allow composer to run as root during the build step
+ENV COMPOSER_ALLOW_SUPERUSER 1
+
+# Start the web server and PHP-FPM
+CMD ["/start.sh"]

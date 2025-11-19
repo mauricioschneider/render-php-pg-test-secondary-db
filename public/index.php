@@ -3,8 +3,9 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 // --- Terminal Formatting Constants ---
-define('HEADER_START', "\n\033[1;34m"); // Bold Blue
-define('HEADER_END', "\033[0m\n");     // Reset
+// Note: \n is included in HEADER_START and HEADER_END for clear separation
+define('HEADER_START', "\n\033[1;34m"); // Newline + Bold Blue
+define('HEADER_END', "\033[0m\n");     // Reset + Newline
 define('SUCCESS', "\033[0;32m");       // Green
 define('ERROR', "\033[0;31m");         // Red
 define('RESET', "\033[0m");            // Reset
@@ -18,6 +19,7 @@ $dsn_a = getenv('DB_CONN_A');
 $dsn_b = getenv('DB_CONN_B');
 
 if (!$dsn_a || !$dsn_b) {
+    // Ensure the fatal error message also ends with a newline
     die(ERROR . "FATAL ERROR: Both DB_CONN_A and DB_CONN_B environment variables must be set." . RESET . "\n");
 }
 
@@ -26,10 +28,10 @@ if (!$dsn_a || !$dsn_b) {
  */
 function connectAndQuery(string $dsn, string $label, string $sql): void
 {
-    // Print a clearly visible header for this connection attempt
+    // Print a clearly visible header
     echo HEADER_START . "--- 🔍 DATABASE CONNECTION: $label ---" . HEADER_END;
 
-    // Simple DSN parsing to extract user/password for PDO constructor
+    // Simple DSN parsing
     $dsn_parts = explode(';', $dsn);
     $conn_dsn = '';
     $user = null;
@@ -38,15 +40,15 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
     foreach ($dsn_parts as $part) {
         if (strpos($part, 'user=') === 0) {
             $user = substr($part, 5);
-        } elseif (strpos($part, 'password=') === 0) {
-            $password = substr($part, 9);
+        } elseif (strpos(trim($part), 'password=') === 0) { // Added trim just in case
+            $password = substr(trim($part), 9);
         } else {
             if (!empty($conn_dsn)) $conn_dsn .= ';';
             $conn_dsn .= $part;
         }
     }
 
-    // Output DSN info (excluding password for security)
+    // Output DSN info with explicit newlines
     echo "  > DSN (partial): " . str_replace("pgsql:", "", $conn_dsn) . "\n";
     echo "  > Query: $sql\n";
 
@@ -69,20 +71,23 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
         if ($result) {
             echo SUCCESS . "  Total Fields: " . count($result) . RESET . "\n";
             echo "  Data Row:\n";
-            // Print array contents with indentation for cleaner display
-            echo "  " . str_replace("\n", "\n  ", print_r($result, true));
+            // Print array contents with indentation and ensure print_r's internal newlines are preserved
+            // We use true for print_r to return the string, then print it
+            $data_output = print_r($result, true);
+            echo "  " . str_replace("\n", "\n  ", $data_output) . "\n";
         } else {
             echo "  No rows were returned from 'test' table.\n";
         }
 
     } catch (PDOException $e) {
         echo ERROR . "  ❌ ERROR: PDO Connection or Query Failed." . RESET . "\n";
-        // Only print the first line of the error message for brevity
         $error_message = strtok($e->getMessage(), "\n");
+        // Ensure the error details line has a newline
         echo "  Details: " . $error_message . "\n";
     } finally {
         $pdo = null; // Close the connection
     }
+    // End the block with a final newline separator
     echo "\n----------------------------------------\n";
 }
 
@@ -90,5 +95,3 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
 
 connectAndQuery($dsn_a, "Database A (Primary)", $query);
 connectAndQuery($dsn_b, "Database B (Secondary)", $query);
-
-?>

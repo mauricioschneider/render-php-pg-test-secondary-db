@@ -1,0 +1,19 @@
+{
+  "name": "mauricioschneider/render_php_pg_test_secondary_db",
+  "description": "A simple PHP script to connect to two PostgreSQL databases.",
+  "type": "project",
+  "license": "proprietary",
+  "authors": [
+    {
+      "name": "Mauricio Schneider"
+    }
+  ],
+  "require": {
+    "php": "^8.0"
+  },
+  "autoload": {
+  },
+  "scripts": {
+    "start": "php public/index.php"
+  }
+}

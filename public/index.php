@@ -1,14 +1,20 @@
 <?php
 // File: public/index.php
-require __DIR__ . '/../vendor/autoload.php';
 
-// --- Terminal Formatting Constants ---
-// Note: \n is included in HEADER_START and HEADER_END for clear separation
-define('HEADER_START', "\n\033[1;34m"); // Newline + Bold Blue
-define('HEADER_END', "\033[0m\n");     // Reset + Newline
-define('SUCCESS', "\033[0;32m");       // Green
-define('ERROR', "\033[0;31m");         // Red
-define('RESET', "\033[0m");            // Reset
+// Ensure the page starts with HTML structure
+echo "<!DOCTYPE html>\n";
+echo "<html><head><title>DB Connection Check</title>";
+echo "<style>
+    body { font-family: Arial, sans-serif; background-color: #f4f4f4; color: #333; }
+    .container { width: 80%; margin: 20px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    h2 { color: #0056b3; border-bottom: 2px solid #ccc; padding-bottom: 5px; }
+    .success { color: green; font-weight: bold; }
+    .error { color: red; font-weight: bold; }
+    pre { background: #eee; padding: 10px; border: 1px solid #ddd; border-radius: 4px; overflow-x: auto; }
+</style>";
+echo "</head><body><div class='container'>";
+
+require __DIR__ . '/../vendor/autoload.php';
 
 // The SQL query to be executed on both databases
 $query = "SELECT * FROM test LIMIT 1";
@@ -19,17 +25,17 @@ $dsn_a = getenv('DB_CONN_A');
 $dsn_b = getenv('DB_CONN_B');
 
 if (!$dsn_a || !$dsn_b) {
-    // Ensure the fatal error message also ends with a newline
-    die(ERROR . "FATAL ERROR: Both DB_CONN_A and DB_CONN_B environment variables must be set." . RESET . "\n");
+    echo "<p class='error'>FATAL ERROR: Both DB_CONN_A and DB_CONN_B environment variables must be set.</p></div></body></html>";
+    exit;
 }
 
 /**
- * Connects to a PostgreSQL database using PDO, executes a query, and prints the result.
+ * Connects to a PostgreSQL database using PDO, executes a query, and prints the result in HTML.
  */
 function connectAndQuery(string $dsn, string $label, string $sql): void
 {
-    // Print a clearly visible header
-    echo HEADER_START . "--- 🔍 DATABASE CONNECTION: $label ---" . HEADER_END;
+    // Print a clearly visible HTML header for this connection attempt
+    echo "<h2>🔍 DATABASE CONNECTION: $label</h2>\n";
 
     // Simple DSN parsing
     $dsn_parts = explode(';', $dsn);
@@ -40,7 +46,7 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
     foreach ($dsn_parts as $part) {
         if (strpos($part, 'user=') === 0) {
             $user = substr($part, 5);
-        } elseif (strpos(trim($part), 'password=') === 0) { // Added trim just in case
+        } elseif (strpos(trim($part), 'password=') === 0) {
             $password = substr(trim($part), 9);
         } else {
             if (!empty($conn_dsn)) $conn_dsn .= ';';
@@ -48,9 +54,9 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
         }
     }
 
-    // Output DSN info with explicit newlines
-    echo "  > DSN (partial): " . str_replace("pgsql:", "", $conn_dsn) . "\n";
-    echo "  > Query: $sql\n";
+    // Output DSN info (excluding password for security)
+    echo "<p><strong>DSN (partial):</strong> " . htmlspecialchars(str_replace("pgsql:", "", $conn_dsn)) . "</p>\n";
+    echo "<p><strong>Query:</strong> " . htmlspecialchars($sql) . "</p>\n";
 
 
     try {
@@ -60,38 +66,38 @@ function connectAndQuery(string $dsn, string $label, string $sql): void
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
         ]);
 
-        echo SUCCESS . "  ✅ STATUS: Connection successful." . RESET . "\n";
+        echo "<p class='success'>✅ STATUS: Connection successful.</p>\n";
 
         // 2. Execute the Query
         $statement = $pdo->query($sql);
         $result = $statement->fetch();
 
-        echo "\n  --- RESULT DATA ---\n";
+        echo "<h3>RESULT DATA:</h3>\n";
 
         if ($result) {
-            echo SUCCESS . "  Total Fields: " . count($result) . RESET . "\n";
-            echo "  Data Row:\n";
-            // Print array contents with indentation and ensure print_r's internal newlines are preserved
-            // We use true for print_r to return the string, then print it
-            $data_output = print_r($result, true);
-            echo "  " . str_replace("\n", "\n  ", $data_output) . "\n";
+            echo "<p><strong>Total Fields:</strong> " . count($result) . "</p>\n";
+            echo "<p><strong>Data Row:</strong></p>\n";
+            // Use <pre> tag to display raw array structure cleanly
+            echo "<pre>" . htmlspecialchars(print_r($result, true)) . "</pre>";
         } else {
-            echo "  No rows were returned from 'test' table.\n";
+            echo "<p>No rows were returned from 'test' table.</p>\n";
         }
 
     } catch (PDOException $e) {
-        echo ERROR . "  ❌ ERROR: PDO Connection or Query Failed." . RESET . "\n";
-        $error_message = strtok($e->getMessage(), "\n");
-        // Ensure the error details line has a newline
-        echo "  Details: " . $error_message . "\n";
+        echo "<p class='error'>❌ ERROR: PDO Connection or Query Failed.</p>\n";
+        // Display the full error message in a <pre> block
+        echo "<p><strong>Details:</strong></p><pre>" . htmlspecialchars($e->getMessage()) . "</pre>\n";
     } finally {
         $pdo = null; // Close the connection
     }
-    // End the block with a final newline separator
-    echo "\n----------------------------------------\n";
+    echo "<hr>\n";
 }
 
 // --- 2. Call the function for both databases ---
 
 connectAndQuery($dsn_a, "Database A (Primary)", $query);
 connectAndQuery($dsn_b, "Database B (Secondary)", $query);
+
+// Close the main HTML structure
+echo "</div></body></html>";
+?>
